@@ -3,13 +3,18 @@ Notes:
 - Set all pistons to have Share inertia tensor.
 - Set all X and Y pistons to have Max Impulse Axis/NonAxis to 100kN.
 - Set all Z pistons to have Max Impulse Axis/NonAxis to 600kN.
+
+When activating the programmable block:
+Toggle block on
+Recompile
+You should see it align to [15, 15] and then begin drilling.
 */
 List<IMyExtendedPistonBase> xPistons = null;
 List<IMyExtendedPistonBase> yPistons = null;
 List<IMyExtendedPistonBase> zPistons = null;
 List<IMyExtendedPistonBase> zPausedPistons = null;
 enum Mode {
-    BEGIN, ALIGN, DRILL, PAUSE, DONE
+    PARK, BEGIN, ALIGN, DRILL, PAUSE, DONE
 }
 enum AlignPhase {
     Z_START, Z_FINISH, XY_START, XY_FINISH
@@ -18,9 +23,10 @@ Mode mode = Mode.BEGIN;
 AlignPhase phase = AlignPhase.Z_START;
 int zInProgress = -1;
 List<int> ZONES = new List<int>();
+bool isParking = false;
 
 List<IMyInventory> inventories = new List<IMyInventory>();
-int MAX_INV_PERCENTAGE = 50;
+int MAX_INV_PERCENTAGE = 90;
 List<IMyTextPanel> textPanels = null;
 const float FONT_SIZE = 1.0F;
 int logCounter = 1;
@@ -65,12 +71,18 @@ public Program()
 public void Main(string argument, UpdateType updateSource)
 {
     if (argument.ToUpper() == "RESET") {
-        Log("Resetting ZONES");
+        Log("Resetting ZONES and parking");
         ZONES.Clear();
         InitZones();
+        mode = Mode.PARK;
+        return;
+    }
+    if (argument.ToUpper() == "ZONES") {
+        Log("ZONES: " + String.Join(", ", ZONES));
         return;
     }
     switch (mode) {
+        case Mode.PARK:  DoParkMode(); break;
         case Mode.BEGIN: DoBeginMode(); break;
         case Mode.ALIGN: DoAlignMode(); break;
         case Mode.DRILL: DoDrillMode(); break;
@@ -137,6 +149,12 @@ int GetCurrentZone() {
     return ZONES.Count > 0 ? ZONES[0] : -1;
 }
 
+/*
+ * This is a 5x5 grid of "zones" where each zone is a 3x3 block square, sized to match 
+ * the 9 drillers at the end of the pistons. Zones are counted starting from the bottom left.
+ * Zone 1 is at 0,0, Zone 2 is 3 blocks (7.5m) to the right, etc.
+ * 
+ */
 float[] GetPositionForZone(int zone) {
     float x, y;
     switch (zone) {
@@ -182,6 +200,12 @@ float[] GetCurrentPosition() {
     return pos;
 }
 
+void DoParkMode() {
+    isParking = true;
+    ZONES.Insert(0, 1);
+    mode = Mode.ALIGN;
+}
+
 void DoBeginMode() {
     if (ZONES.Count == 0) {
         Log("DONE");
@@ -225,7 +249,7 @@ void DoAlignMode() {
         float[] desiredPosition = GetPositionForZone(GetCurrentZone());
         float xLengthRemaining = desiredPosition[0];
         float yLengthRemaining = desiredPosition[1];
-        Log($"Aligning: [{xLengthRemaining}, {yLengthRemaining}]");
+        Log($"Aligning to zone {GetCurrentZone()}: [{xLengthRemaining}, {yLengthRemaining}]");
 
         xPistons.ForEach(p => {
             if (xLengthRemaining > 0) {
@@ -255,8 +279,14 @@ void DoAlignMode() {
             // done
             xPistons.ForEach(Disable);
             yPistons.ForEach(Disable);
-            Log("All X and Y pistons aligned");
-            mode = Mode.BEGIN;
+            Log("Done aligning, all X and Y pistons aligned");
+            if (isParking) {
+                isParking = false;
+                ZONES.RemoveAt(0);
+                mode = Mode.DONE;
+            } else {
+                mode = Mode.BEGIN;
+            }
         }
     }
 }
