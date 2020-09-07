@@ -27,22 +27,25 @@ bool isParking = false;
 
 List<IMyInventory> inventories = new List<IMyInventory>();
 int MAX_INV_PERCENTAGE = 90;
-List<IMyTextPanel> textPanels = null;
+List<IMyTextSurface> textSurfaces = null;
 const float FONT_SIZE = 1.0F;
 int logCounter = 1;
 const float INITIAL_SPEED = 0.5F; // this should be positive
 
 public Program()
 {
-    textPanels = FilterBlocks<IMyTextPanel>(b => b.CustomName.Contains("[DRILL]"));
-    if (textPanels.Count() == 0) {
+    textSurfaces = FilterBlocks<IMyTextPanel>(b => b.CustomName.Contains("[DRILL]")).ConvertAll(x => (IMyTextSurface)x);
+    if (textSurfaces.Count() == 0) {
         Log("Warning: No Text Panel(s) with [DRILL] found. Add one or more.");
     }
-    textPanels.ForEach(textPanel => {
-        textPanel.ContentType = ContentType.TEXT_AND_IMAGE;
-        textPanel.FontSize = FONT_SIZE;
-        textPanel.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-        Log($"Using Text Panel: {textPanel.CustomName}");
+	textSurfaces.Add(Me.GetSurface(0));
+    textSurfaces.ForEach(textSurface => {
+        textSurface.ContentType = ContentType.TEXT_AND_IMAGE;
+        textSurface.FontSize = FONT_SIZE;
+        textSurface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+        if (textSurface is IMyTextPanel) {
+            Log($"Using Text Panel: {((IMyTextPanel)textSurface).CustomName}");
+        }
     });
 
     if (IsFirstTime()) {
@@ -72,7 +75,6 @@ public void Main(string argument, UpdateType updateSource)
 {
     if (argument.ToUpper() == "RESET") {
         Log("Resetting ZONES and parking");
-        ZONES.Clear();
         InitZones();
         mode = Mode.PARK;
         return;
@@ -102,6 +104,7 @@ bool IsFirstTime() {
 }
 
 void InitZones() {
+    ZONES.Clear();
     ZONES.Add(13);
     ZONES.Add(12);
     ZONES.Add(17);
@@ -203,17 +206,25 @@ float[] GetCurrentPosition() {
 void DoParkMode() {
     isParking = true;
     ZONES.Insert(0, 1);
+    DisableDrills();
+    DisablePistons();
     mode = Mode.ALIGN;
+    phase = AlignPhase.Z_START;
+}
+
+void DoneParking() {
+    Log("Done parking, inactivating");
+    isParking = false;
+    ZONES.RemoveAt(0);
+    mode = Mode.DONE;
+    Runtime.UpdateFrequency = UpdateFrequency.None;
 }
 
 void DoBeginMode() {
     if (ZONES.Count == 0) {
-        Log("DONE");
-        mode = Mode.DONE;
-        Runtime.UpdateFrequency = UpdateFrequency.None;
-        return;
-    }
-    if (IsAlignedToCurrentZone()) {
+        Log("ALL ZONES DRILLED");
+        mode = Mode.PARK;
+    } else if (IsAlignedToCurrentZone()) {
         Log("We are aligned");
         mode = Mode.DRILL;
     } else {
@@ -281,9 +292,7 @@ void DoAlignMode() {
             yPistons.ForEach(Disable);
             Log("Done aligning, all X and Y pistons aligned");
             if (isParking) {
-                isParking = false;
-                ZONES.RemoveAt(0);
-                mode = Mode.DONE;
+                DoneParking();
             } else {
                 mode = Mode.BEGIN;
             }
@@ -329,7 +338,7 @@ void DoDrillMode() {
         var piston = zPistons[zInProgress];
         if (IsPistonDone(piston)) {
             // done.
-            Log($"Z{zInProgress} done");
+            Log($"Z{zInProgress + 1} done");
             Disable(piston);
             zInProgress = -1;
         }
@@ -454,8 +463,8 @@ public void Log(string message)
 
     Echo(message);
 
-    if (textPanels != null) {
-        textPanels.ForEach(t => {
+    if (textSurfaces != null) {
+        textSurfaces.ForEach(t => {
             string oldText = t.GetText();
             // only keep most recent 25 lines
             IEnumerable<string> oldLines = oldText.Split(new string[] {"\r\n","\n"}, StringSplitOptions.RemoveEmptyEntries).Take(25);
