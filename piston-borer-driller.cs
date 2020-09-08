@@ -1,6 +1,8 @@
 /*
 Notes:
+- Piston orientations are auto detected. You only need to name them if you want them extended "in order" instead of randomly.
 - Set all pistons to have Share inertia tensor.
+- Wonder if I can stop doing this:
 - Set all X and Y pistons to have Max Impulse Axis/NonAxis to 100kN.
 - Set all Z pistons to have Max Impulse Axis/NonAxis to 600kN.
 
@@ -8,6 +10,9 @@ When activating the programmable block:
 Toggle block on
 Recompile
 You should see it align to [15, 15] and then begin drilling.
+
+To park it so it can be blueprinted:
+Run with argument: RESET
 */
 List<IMyExtendedPistonBase> xPistons = null;
 List<IMyExtendedPistonBase> yPistons = null;
@@ -27,26 +32,25 @@ bool isParking = false;
 
 List<IMyInventory> inventories = new List<IMyInventory>();
 int MAX_INV_PERCENTAGE = 90;
-List<IMyTextSurface> textSurfaces = null;
+const float INITIAL_SPEED = 0.5F; // this should be positive
+IMyTextSurface myScreen = null;
 const float FONT_SIZE = 1.0F;
 int logCounter = 1;
-const float INITIAL_SPEED = 0.5F; // this should be positive
 
 public Program()
 {
-    textSurfaces = FilterBlocks<IMyTextPanel>(b => b.CustomName.Contains("[DRILL]")).ConvertAll(x => (IMyTextSurface)x);
-    if (textSurfaces.Count() == 0) {
-        Log("Warning: No Text Panel(s) with [DRILL] found. Add one or more.");
-    }
-	textSurfaces.Add(Me.GetSurface(0));
-    textSurfaces.ForEach(textSurface => {
-        textSurface.ContentType = ContentType.TEXT_AND_IMAGE;
-        textSurface.FontSize = FONT_SIZE;
-        textSurface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-        if (textSurface is IMyTextPanel) {
-            Log($"Using Text Panel: {((IMyTextPanel)textSurface).CustomName}");
-        }
-    });
+	myScreen = Me.GetSurface(0);
+    myScreen.ContentType = ContentType.TEXT_AND_IMAGE;
+    myScreen.FontSize = FONT_SIZE;
+    myScreen.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+
+    DiscoverPistons();
+    DisablePistons();
+    xPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
+    yPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
+    zPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
+
+    DisableDrills();
 
     if (IsFirstTime()) {
         InitZones();
@@ -57,16 +61,6 @@ public Program()
     }
 
     DiscoverInventories();
-
-    xPistons = FilterBlocks<IMyExtendedPistonBase>(p => p.CustomName.Contains("Piston X")).OrderBy(p => p.CustomName).ToList();
-    yPistons = FilterBlocks<IMyExtendedPistonBase>(p => p.CustomName.Contains("Piston Y")).OrderBy(p => p.CustomName).ToList();
-    zPistons = FilterBlocks<IMyExtendedPistonBase>(p => p.CustomName.Contains("Piston Z")).OrderBy(p => p.CustomName).ToList();
-    DisablePistons();
-    xPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
-    yPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
-    zPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
-
-    DisableDrills();
 
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
 }
@@ -80,7 +74,7 @@ public void Main(string argument, UpdateType updateSource)
         return;
     }
     if (argument.ToUpper() == "ZONES") {
-        Log("ZONES: " + String.Join(", ", ZONES));
+        Log($"{ZONES.Count} ZONES: " + String.Join(", ", ZONES));
         return;
     }
     switch (mode) {
@@ -99,37 +93,127 @@ public void Save()
     Storage = String.Join(";", storageData);
 }
 
+/*
+The "Z" pistons are the ones with "down" pointing the same way as the Programmable Block's "up"
+The first "X" piston is the piston closest to me (that's not a Z), it and all remaining pistons with the same orientation are the "X" pistons
+The "Y" pistons are whatever's left.
+*/
+void DiscoverPistons() {
+    float closeEnough = 0.1F;
+
+    zPistons = FilterBlocks<IMyExtendedPistonBase>(piston => {
+        return IsZero(Me.WorldMatrix.Up - piston.WorldMatrix.Down, closeEnough);
+    });
+
+    IMyExtendedPistonBase closestPiston = FilterBlocks<IMyExtendedPistonBase>(piston => !zPistons.Contains(piston))
+        .OrderBy(piston => vecToRange(Me.GetPosition(), piston.GetPosition()))
+        .First();
+    if (closestPiston == null) {
+        throw new Exception("Unable to find closest piston");
+    }
+
+    xPistons = FilterBlocks<IMyExtendedPistonBase>(piston => {
+        return IsZero(closestPiston.WorldMatrix.Down - piston.WorldMatrix.Down, closeEnough);
+    });
+
+    IMyExtendedPistonBase firstY = null;
+    yPistons = FilterBlocks<IMyExtendedPistonBase>(piston => {
+        if (xPistons.Contains(piston) || zPistons.Contains(piston)) {
+            return false;
+        }
+        if (firstY == null) {
+            firstY = piston;
+            return true;
+        }
+        return IsZero(firstY.WorldMatrix.Down - piston.WorldMatrix.Down, closeEnough);
+    });
+}
+
 bool IsFirstTime() {
     return String.IsNullOrEmpty(Storage);
 }
 
 void InitZones() {
     ZONES.Clear();
-    ZONES.Add(13);
-    ZONES.Add(12);
-    ZONES.Add(17);
-    ZONES.Add(18);
-    ZONES.Add(19);
-    ZONES.Add(14);
-    ZONES.Add(9);
-    ZONES.Add(8);
-    ZONES.Add(7);
-    ZONES.Add(6);
-    ZONES.Add(11);
-    ZONES.Add(16);
-    ZONES.Add(21);
-    ZONES.Add(22);
-    ZONES.Add(23);
-    ZONES.Add(24);
-    ZONES.Add(25);
-    ZONES.Add(20);
-    ZONES.Add(15);
-    ZONES.Add(10);
-    ZONES.Add(5);
-    ZONES.Add(4);
-    ZONES.Add(3);
-    ZONES.Add(2);
-    ZONES.Add(1);
+
+    // find the middle. work around in a spiral fashion, staying within the confines of the available zones
+
+    int xAxisLength = 1 + xPistons.Count * 4;
+    int yAxisLength = 1 + yPistons.Count * 4;
+    int numZones = xAxisLength * yAxisLength;
+
+    int x = (int)Math.Floor(1.0 * xAxisLength / 2);
+    int y = (int)Math.Floor(1.0 * yAxisLength / 2);
+
+    // add the middle zone
+    int zone = GetZoneAtGridCoords(x, y);
+    Log($"Middle zone {zone} at [{x}, {y}]");
+    ZONES.Add(zone);
+
+    // then spiral out from it
+    bool hopAlongX = true;
+    bool hopPositively = true;
+    int hopsToDo = 1;
+
+    while (ZONES.Count < numZones) {
+        int hopsDone = 0;
+
+        while (hopsDone++ < hopsToDo) {
+            if (hopAlongX) {
+                x += hopPositively ? 1 : -1;
+            } else {
+                y += hopPositively ? 1 : -1;
+            }
+
+            zone = GetZoneAtGridCoords(x, y);
+            if (zone == -1) {
+                Log($"Skipping invalid coords [{x}, {y}]");
+            } else {
+                Log($"+zone {zone} at [{x}, {y}]");
+                ZONES.Add(zone);
+            }
+        }
+
+        if (!hopAlongX) {
+            // increase number of hops and flip direction after completing y hops
+            hopsToDo++;
+            hopPositively = !hopPositively;
+        }
+        hopAlongX = !hopAlongX;
+    }
+}
+
+// Returns -1 on invalid zone.
+int GetZoneAtGridCoords(int x, int y) {
+    int xAxisLength = 1 + xPistons.Count * 4;
+    int yAxisLength = 1 + yPistons.Count * 4;
+
+    if (x < 0 || y < 0 || x > xAxisLength - 1 || y > yAxisLength - 1) {
+        return -1;
+    }
+
+    return (x + 1) + (y * xAxisLength);
+}
+
+int GetCurrentZone() {
+    return ZONES.Count > 0 ? ZONES[0] : -1;
+}
+
+float[] GetPositionForZone(int zone) {
+    zone--; // make the given zone zero-based, easier to do the math
+    int xAxisLength = 1 + xPistons.Count * 4;
+    int xSpot = zone % xAxisLength;
+    // Each spot past the first requires extending the piston by one block size (2.5m)
+    float x = xSpot * 2.5F;
+
+    int yAxisLength = 1 + yPistons.Count * 4;
+    int ySpot = (int)Math.Floor(1.0 * zone / xAxisLength);
+    float y = ySpot * 2.5F;
+
+    // Log($"xAxisLength: {xAxisLength}, xSpot: {xSpot}, x: {x}");
+    // Log($"yAxisLength: {yAxisLength}, ySpot: {ySpot}, y: {y}");
+
+    return new float[] { x, y };
 }
 
 void LoadZonesFromStorage() {
@@ -146,52 +230,6 @@ void LoadZonesFromStorage() {
             }
         }
     }
-}
-
-int GetCurrentZone() {
-    return ZONES.Count > 0 ? ZONES[0] : -1;
-}
-
-/*
- * This is a 5x5 grid of "zones" where each zone is a 3x3 block square, sized to match 
- * the 9 drillers at the end of the pistons. Zones are counted starting from the bottom left.
- * Zone 1 is at 0,0, Zone 2 is 3 blocks (7.5m) to the right, etc.
- * 
- */
-float[] GetPositionForZone(int zone) {
-    float x, y;
-    switch (zone) {
-        case 1: x = 0; y = 0; break;
-        case 2: x = 7.5F; y = 0; break;
-        case 3: x = 15; y = 0; break;
-        case 4: x = 22.5F; y = 0; break;
-        case 5: x = 30; y = 0; break;
-        case 6: x = 0; y = 7.5F; break;
-        case 7: x = 7.5F; y = 7.5F; break;
-        case 8: x = 15; y = 7.5F; break;
-        case 9: x = 22.5F; y = 7.5F; break;
-        case 10: x = 30; y = 7.5F; break;
-        case 11: x = 0; y = 15; break;
-        case 12: x = 7.5F; y = 15; break;
-        case 13: x = 15; y = 15; break;
-        case 14: x = 22.5F; y = 15; break;
-        case 15: x = 30; y = 15; break;
-        case 16: x = 0; y = 22.5F; break;
-        case 17: x = 7.5F; y = 22.5F; break;
-        case 18: x = 15; y = 22.5F; break;
-        case 19: x = 22.5F; y = 22.5F; break;
-        case 20: x = 30; y = 22.5F; break;
-        case 21: x = 0; y = 30; break;
-        case 22: x = 7.5F; y = 30; break;
-        case 23: x = 15; y = 30; break;
-        case 24: x = 22.5F; y = 30; break;
-        case 25: x = 30; y = 30; break;
-        default: x = 0; y = 0; break;
-    }
-    float[] pos = new float[2];
-    pos[0] = x;
-    pos[1] = y;
-    return pos;
 }
 
 float[] GetCurrentPosition() {
@@ -457,21 +495,33 @@ void AddInventories(IMyTerminalBlock b)
     }
 }
 
+
+// from Cats' cats-ray code
+double vecToRange( Vector3D tar, Vector3D org ) { 
+    return Math.Sqrt(Math.Pow( tar.X - org.X, 2 ) + Math.Pow( tar.Y - org.Y, 2 ) + Math.Pow( tar.Z - org.Z, 2 )); 
+} 
+
+// from Whip's code
+public bool IsZero(Vector3D v, double epsilon = 1e-4)
+{
+    if (Math.Abs(v.X) > epsilon) return false;
+    if (Math.Abs(v.Y) > epsilon) return false;
+    if (Math.Abs(v.Z) > epsilon) return false;
+    return true;
+}
+
 public void Log(string message)
 {
     message = $"{logCounter++}: {message.Trim()}";
 
     Echo(message);
 
-    if (textSurfaces != null) {
-        textSurfaces.ForEach(t => {
-            string oldText = t.GetText();
-            // only keep most recent 25 lines
-            IEnumerable<string> oldLines = oldText.Split(new string[] {"\r\n","\n"}, StringSplitOptions.RemoveEmptyEntries).Take(25);
-            string newText = message + "\n" + string.Join(Environment.NewLine.ToString(), oldLines);
-            t.WriteText(newText);
-        });
-    }
+    string oldText = myScreen.GetText();
+    // only keep most recent 25 lines
+    IEnumerable<string> oldLines = oldText.Split(new string[] {"\r\n","\n"}, StringSplitOptions.RemoveEmptyEntries).Take(25);
+    string newText = message + Environment.NewLine.ToString()
+        + string.Join(Environment.NewLine.ToString(), oldLines);
+    myScreen.WriteText(newText);
 }
 
 public List<T> FilterBlocks<T>(Func<T, Boolean> filter = null) where T : class, IMyTerminalBlock
