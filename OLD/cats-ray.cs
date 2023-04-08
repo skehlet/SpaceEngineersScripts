@@ -34,12 +34,12 @@
 *   multiple commands can be seperated by ',' eg: Set_Rng:100,DoScan,Set_Rng:10 (which would set range to 100, do a scan and then reset range to 10) 
 */ 
  
-string gs_Prefix = null; // prefix of lcd panel to use (set to null to ignore prefix) 
-string gs_LCD_Tag = "[OUT]"; // tag of lcd panel to use (set to null to ignore tag) 
+string gs_Prefix = ""; // prefix of lcd panel to use (set to null to ignore prefix) 
+string gs_LCD_Tag = "[RC]"; // tag of lcd panel to use (set to null to ignore tag) 
 // example of LCd using prefix and tag: "[RC] LCD [OUT]"
 
 // full name of camera to use (prefix and tag only apply to LCDs, set camera name to whatever you like as long as it matches what is in this variable) 
-string gs_Cam_Name = "Camera FORWARD"; 
+string gs_Cam_Name = "DNTL Camera front [SAM]"; 
 
 
 string gs_StoreTag = "CBRF"; // used in storage variable to identify a valid storage value 
@@ -495,7 +495,7 @@ private List<string> procDetectedEntity( MyDetectedEntityInfo scanData ) {
     data.Add( new StringBuilder( "Type: " ).Append( g_EntityType[findType( scanData )] ).ToString() ); 
     data.Add( new StringBuilder( "Status: " ).Append( g_Relationships[findRelationship( scanData )] ).ToString() ); 
     if( gb_ShowGPS ) { 
-        //data.Add( vecToGPS( scanData.Position, scanData.Name ) ); 
+        data.Add( vecToGPS( scanData.Position, scanData.Name ) ); 
         if (scanData.HitPosition.HasValue) {
             data.Add( vecToGPS( scanData.HitPosition.Value, scanData.Name ) ); 
         }

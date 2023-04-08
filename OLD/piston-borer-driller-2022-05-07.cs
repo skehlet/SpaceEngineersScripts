@@ -1,26 +1,22 @@
 /*
 Notes:
-- One drill at the end of the z pistons.
-- This script will adapt to however many x, y, and z pistons you have.
+- ONE drill at the end of the z pistons.
+- This script should adapt to however many x, y, and z pistons you have. You'll
+  have to figure out how tall it needs to be etc.
 - Piston orientations are auto detected. You only need to name them if you want
   them extended "in order" instead of randomly.
-- You have to figure out how tall it needs to be, see notes.
-
-When setting up a new station:
 - Set all pistons to have Share inertia tensor.
-- On the Sorter for the Ejector, remember to set a Whitelist with Stone and Ice, and
+- On the ejector sorter, remember to set a Whitelist with Stone and Ice, and
   select Drain All.
-- On the Ejector Connector, set Throw Out: On.
-- On the ship Connector, set a Blacklist with Stone and Ice, and set Drain All
+- On the ejector connector, set Throw Out: On.
+- On the connector sorter, set a Blacklist with Stone and Ice, and set Drain All
   (to pull from the Drills).
-- I added support to tag only the drills+pistons+cargo containers you want it to
-  consider. Add your tag value to the Programmable Block's CustomData (without
-  any square brackets). Then, on each piston+drill+cargo, add [YOUR-TAG] to the
-  Name field. You will need to recompile after doing this. You may need to run
-  the command "RESET" and start over.
+- You can only have one of these in a zone. So if you hook it up to your base,
+  you should probably use two Connectors to separate it from the other cargo
+  containers.
 
 When activating the programmable block: Toggle block on Recompile You should see
-it align to [15, 15] (or your middle if not 3 x and y pistons) and then begin drilling.
+it align to [15, 15] and then begin drilling.
 
 To park it so it can be blueprinted: Run with argument: RESET
 */
@@ -28,7 +24,6 @@ List<IMyExtendedPistonBase> xPistons = null;
 List<IMyExtendedPistonBase> yPistons = null;
 List<IMyExtendedPistonBase> zPistons = null;
 List<IMyExtendedPistonBase> zPausedPistons = null;
-List<IMyShipDrill> drills = null;
 enum Mode {
     PARK, BEGIN, ALIGN, DRILL, PAUSE, DONE
 }
@@ -46,9 +41,8 @@ List<IMyInventory> inventories = new List<IMyInventory>();
 int MAX_INV_PERCENTAGE = 90;
 const float INITIAL_SPEED = 0.5F; // this should be positive
 IMyTextSurface myScreen = null;
-const float FONT_SIZE = 0.75F;
+const float FONT_SIZE = 1.0F;
 int logCounter = 1;
-string filterTag = null;
 
 public Program()
 {
@@ -57,30 +51,13 @@ public Program()
     myScreen.FontSize = FONT_SIZE;
     myScreen.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
 
-    filterTag = Me.CustomData;
-    if (!String.IsNullOrEmpty(filterTag)) {
-        Log($"Tag: {filterTag}");
-    }
-
     DiscoverPistons();
     DisablePistons();
     xPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
     yPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
     zPistons.ForEach(p => p.Velocity = INITIAL_SPEED);
-    Log($"Found: {xPistons.Count} X pistons");
-    Log($"Found: {yPistons.Count} Y pistons");
-    Log($"Found: {zPistons.Count} Z pistons");
 
-    DiscoverDrills();
     DisableDrills();
-    Log($"Found: {drills.Count} drills");
-    if (drills.Count == 0) {
-        Log("Error, no drills found");
-        return;
-    }
-
-    DiscoverInventories();
-    Log($"Found: {inventories.Count} inventories");
 
     if (IsFirstTime()) {
         InitZones();
@@ -89,6 +66,8 @@ public Program()
         LoadZonesFromStorage();
         Log("Loaded ZONES: " + String.Join(", ", ZONES));
     }
+
+    DiscoverInventories();
 
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
 }
@@ -103,10 +82,6 @@ public void Main(string argument, UpdateType updateSource)
     }
     if (argument.ToUpper() == "ZONES") {
         Log($"{ZONES.Count} ZONES: " + String.Join(", ", ZONES));
-        return;
-    } else if (argument.ToUpper() == "NEXT") {
-        ZONES.RemoveAt(0);
-        mode = Mode.BEGIN;
         return;
     }
     switch (mode) {
@@ -296,10 +271,9 @@ void DoBeginMode() {
         Log("ALL ZONES DRILLED");
         mode = Mode.PARK;
     } else if (IsAlignedToCurrentZone()) {
-        Log("We are aligned, now drilling");
+        Log("We are aligned");
         mode = Mode.DRILL;
     } else {
-        Log($"Aligning to zone {GetCurrentZone()}");
         DisableDrills();
         DisablePistons();
         mode = Mode.ALIGN;
@@ -485,30 +459,23 @@ bool IsPistonDone(IMyExtendedPistonBase piston) {
 }
 
 public bool AreAllPistonsFunctional() {
-    // TODO: look into CurrentDamage, not just IsFunctional
     var brokenXs = xPistons.FindAll(p => !p.IsFunctional);
     var brokenYs = yPistons.FindAll(p => !p.IsFunctional);
     var brokenZs = zPistons.FindAll(p => !p.IsFunctional);
     return (brokenXs.Count == 0 && brokenYs.Count == 0 && brokenZs.Count == 0);
 }
 
-void DiscoverDrills() {
-    drills = FilterBlocks<IMyShipDrill>();
-}
-
 void EnableDrills() {
-    drills.ForEach(Enable);
+    FilterBlocks<IMyShipDrill>().ForEach(Enable);
 }
 
 void DisableDrills() {
-    drills.ForEach(Disable);
+    FilterBlocks<IMyShipDrill>().ForEach(Disable);
 }
 
 bool AreAllDrillsFunctional() {
-    // there should only be one drill, so this should be improved
-    var functionalDrills = drills.FindAll(d => d.IsFunctional);
-    var brokenDrills = drills.FindAll(d => !d.IsFunctional);
-    return functionalDrills.Count > 0 && brokenDrills.Count == 0;
+    var brokenDrills = FilterBlocks<IMyShipDrill>().FindAll(d => !d.IsFunctional);
+    return brokenDrills.Count == 0;
 }
 
 public double GetInventoryFullPercent() {
@@ -525,12 +492,12 @@ public void DiscoverInventories()
 {
     FilterBlocks<IMyCargoContainer>().ForEach(AddInventories);
     FilterBlocks<IMyCockpit>().ForEach(AddInventories);
-    drills.ForEach(AddInventories);
+    FilterBlocks<IMyShipDrill>().ForEach(AddInventories);
 }
 
 void AddInventories(IMyTerminalBlock b)
 {
-    Log($"Found inventory: {b.DisplayNameText}");
+    Log($"Found: {b.DisplayNameText}");
     for (int i = 0; i < b.InventoryCount; i++) {
         inventories.Add(b.GetInventory(i));
     }
@@ -570,11 +537,6 @@ public List<T> FilterBlocks<T>(Func<T, Boolean> filter = null) where T : class, 
     var blocks = new List<T>();
     GridTerminalSystem.GetBlocksOfType(blocks, x => {
         if (!x.IsSameConstructAs(Me)) return false;
-        // If a tag was defined (in CustomData), only accept blocks with that tag
-        if (!String.IsNullOrEmpty(filterTag) && 
-            x.DisplayNameText.IndexOf($"[{filterTag}]", 0, StringComparison.CurrentCultureIgnoreCase) == -1) {
-            return false;
-        }
         return (filter == null) || filter(x);
     });
     return blocks.ConvertAll(x => (T)x);

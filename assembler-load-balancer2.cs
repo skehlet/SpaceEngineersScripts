@@ -1,17 +1,39 @@
+IMyTextSurface myScreen = null;
+int logCounter = 1;
+const float FONT_SIZE = 1.0F;
 double lastRunTimeMs = 0;
 
 public Program()
 {
-    Echo("Assembler Load Balancer v2.0");
+	myScreen = Me.GetSurface(0);
+    myScreen.ContentType = ContentType.TEXT_AND_IMAGE;
+    myScreen.FontSize = FONT_SIZE;
+    myScreen.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+
+    Log("Assembler Load Balancer v2.0");
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
 }
 
 List<IMyAssembler> FindAssemblers()
 {
     return FilterBlocks<IMyAssembler>(assembler => {
-        if (!assembler.IsWorking) return false;
-        if (!assembler.DetailedInfo.Contains("Type: Assembler")) return false; // filter out Survival kits
-        if (assembler.Mode != MyAssemblerMode.Assembly) return false;
+        //Log($"assembler: {assembler.DetailedInfo}");
+        if (!assembler.IsWorking) {
+            Log($"Skipping {assembler.Name}, not working");
+            return false;
+        }
+        if (assembler.DetailedInfo.Contains("Type: Survival Kit")) {
+            Log($"Skipping {assembler.Name}, is Survival kit");
+            return false; // filter out Survival kits
+        }
+        // if (!assembler.DetailedInfo.Contains("Type: Assembler")) {
+        //     Log($"Skipping {assembler.Name}, is Survival kit?");
+        //     return false; // filter out Survival kits
+        // }
+        if (assembler.Mode != MyAssemblerMode.Assembly) {
+            Log($"Skipping {assembler.Name}, in disassembly mode");
+            return false;
+        }
         return true;
     });
 }
@@ -22,7 +44,7 @@ public void Main(string argument, UpdateType updateSource)
     if (now - lastRunTimeMs < 5000) {
         return;
     }
-    Echo($"Running at {now}");
+    Log($"Running at {now}");
     lastRunTimeMs = now;
 
     LoadBalanceAssemblers();
@@ -48,6 +70,7 @@ void LoadBalanceAssemblers()
     List<MyProductionItem> myItems = new List<MyProductionItem>();
 
     if (assemblers.Count == 0) {
+        Log("No assemblers found");
         return;
     }
 
@@ -57,7 +80,7 @@ void LoadBalanceAssemblers()
     }).Sum();
 
     int average = (int)Math.Ceiling(1.0 * allItemCount / assemblers.Count);
-    Echo($"Tot: {allItemCount}/{assemblers.Count} Avg: {average}");
+    Log($"Tot: {allItemCount}/{assemblers.Count} Avg: {average}");
 
     List<IMyAssembler> sortedAssemblers = assemblers.OrderByDescending(assembler => {
         assembler.GetQueue(myItems);
@@ -69,7 +92,7 @@ void LoadBalanceAssemblers()
     sortedAssemblers.ForEach(assembler => {
         assembler.GetQueue(myItems);
         int myTotalItemCount = myItems.Select(item => (int)item.Amount).Sum();
-        Echo($"{myTotalItemCount}/{average}: {assembler.CustomName}");
+        Log($"{myTotalItemCount}/{average}: {assembler.CustomName}");
 
         if (myTotalItemCount > average) {
             int myItemCount = 0;
@@ -79,11 +102,11 @@ void LoadBalanceAssemblers()
                 if (myItemCount < average) {
                     int spaceAvailable = average - myItemCount;
                     if (myItem.Amount <= spaceAvailable) {
-                        Echo($"{myItemIdx}: OK {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
+                        Log($"{myItemIdx}: OK {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
                         myItemCount += (int)myItem.Amount;
                     } else {
                         // must reduce this item and put excess into holding bin
-                        Echo($"{myItemIdx}: ONLY {spaceAvailable}/{myItem.Amount} {GetShortName(myItem.BlueprintId)}");
+                        Log($"{myItemIdx}: ONLY {spaceAvailable}/{myItem.Amount} {GetShortName(myItem.BlueprintId)}");
                         int excess = (int)myItem.Amount - spaceAvailable;
                         assembler.RemoveQueueItem(myItemIdx, (double)excess);
                         myItemCount += spaceAvailable;
@@ -92,7 +115,7 @@ void LoadBalanceAssemblers()
                     }
                 } else {
                     // all to holding bin
-                    Echo($"{myItemIdx}: XS {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
+                    Log($"{myItemIdx}: XS {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
                     assembler.RemoveQueueItem(myItemIdx, (double)myItem.Amount);
                     holdingBin.Add(myItem);
                 }
@@ -105,13 +128,13 @@ void LoadBalanceAssemblers()
 
                 if (myItem.Amount <= takeCount) {
                     // take it all
-                    Echo($"ADD {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
+                    Log($"ADD {myItem.Amount} {GetShortName(myItem.BlueprintId)}");
                     assembler.AddQueueItem(myItem.BlueprintId, myItem.Amount);
                     takeCount -= (int)myItem.Amount;
 
                 } else {
                     // take only part and put the rest back
-                    Echo($"ADD {takeCount}/{myItem.Amount} {GetShortName(myItem.BlueprintId)}");
+                    Log($"ADD {takeCount}/{myItem.Amount} {GetShortName(myItem.BlueprintId)}");
                     assembler.AddQueueItem(myItem.BlueprintId, (double)takeCount);
                     MyProductionItem myNewItem = new MyProductionItem(myItem.ItemId, myItem.BlueprintId, myItem.Amount - takeCount);
                     holdingBin.Insert(0, myNewItem);
@@ -123,7 +146,7 @@ void LoadBalanceAssemblers()
 
     if (holdingBin.Count != 0) {
         // should not happen
-        Echo($"ERROR: Len holding bin: {holdingBin.Count}");
+        Log($"ERROR: Len holding bin: {holdingBin.Count}");
     }
 }
 
@@ -146,4 +169,18 @@ public T GetFirstBlockOfType<T>(Func<T, Boolean> filter = null) where T : class,
 {
     var blocks = FilterBlocks<T>(filter);
     return (blocks.Count == 0) ? null : blocks.First();
+}
+
+public void Log(string message)
+{
+    message = $"{logCounter++}: {message.Trim()}";
+
+    Echo(message);
+
+    string oldText = myScreen.GetText();
+    // only keep most recent 50 lines
+    IEnumerable<string> oldLines = oldText.Split(new string[] {"\r\n","\n"}, StringSplitOptions.RemoveEmptyEntries).Take(50);
+    string newText = message + Environment.NewLine.ToString()
+        + string.Join(Environment.NewLine.ToString(), oldLines);
+    myScreen.WriteText(newText);
 }

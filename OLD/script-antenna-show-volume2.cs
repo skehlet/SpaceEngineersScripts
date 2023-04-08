@@ -1,14 +1,22 @@
 IMyRadioAntenna antenna = null;
 List<IMyInventory> inventories = new List<IMyInventory>();
+IMyTextSurface myScreen = null;
+const float FONT_SIZE = 0.75F;
+int logCounter = 1;
 
 public Program()
 {
+	myScreen = Me.GetSurface(0);
+    myScreen.ContentType = ContentType.TEXT_AND_IMAGE;
+    myScreen.FontSize = FONT_SIZE;
+    myScreen.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+
     antenna = GetFirstBlockOfType<IMyRadioAntenna>(b => b.CustomName.Contains("[VOL]"));
     if (antenna == null) {
-        Echo("Error: No Antenna with [VOL] found, go add one.");
+        Log("Error: No Antenna with [VOL] found, go add one.");
         return;
     }
-    Echo("Using Antenna: " + antenna.CustomName);
+    Log("Using Antenna: " + antenna.CustomName);
     DiscoverInventories();
     if (inventories.Count == 0) return;
     Runtime.UpdateFrequency = UpdateFrequency.Update100;
@@ -44,7 +52,7 @@ public void DiscoverInventories()
 
 void AddInventories(IMyTerminalBlock b)
 {
-    Echo($">> {b.DisplayNameText}");
+    Log($"Found: {b.DisplayNameText}");
     for (int i = 0; i < b.InventoryCount; i++) {
         inventories.Add(b.GetInventory(i));
     }
@@ -64,4 +72,18 @@ public T GetFirstBlockOfType<T>(Func<T, Boolean> filter = null) where T : class,
 {
     var blocks = FilterBlocks<T>(filter);
     return (blocks.Count == 0) ? null : blocks.First();
+}
+
+public void Log(string message)
+{
+    message = $"{logCounter++}: {message.Trim()}";
+
+    Echo(message);
+
+    string oldText = myScreen.GetText();
+    // only keep most recent 25 lines
+    IEnumerable<string> oldLines = oldText.Split(new string[] {"\r\n","\n"}, StringSplitOptions.RemoveEmptyEntries).Take(25);
+    string newText = message + Environment.NewLine.ToString()
+        + string.Join(Environment.NewLine.ToString(), oldLines);
+    myScreen.WriteText(newText);
 }
