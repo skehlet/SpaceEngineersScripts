@@ -8,19 +8,20 @@ Notes:
 
 When setting up a new station:
 - Set all pistons to have Share inertia tensor.
-- On the Sorter for the Ejector, remember to set a Whitelist with Stone and Ice, and
-  select Drain All.
+- On the Sorter for the Ejector, remember to set a Whitelist with Stone and Ice,
+  and select Drain All.
 - On the Ejector Connector, set Throw Out: On.
 - On the ship Connector, set a Blacklist with Stone and Ice, and set Drain All
   (to pull from the Drills).
 - I added support to tag only the drills+pistons+cargo containers you want it to
   consider. Add your tag value to the Programmable Block's CustomData (without
   any square brackets). Then, on each piston+drill+cargo, add [YOUR-TAG] to the
-  Name field. You will need to recompile after doing this. You may need to run
-  the command "RESET" and start over.
+  Name field. You will need to run the command "RESET" and recompile after doing
+  this.
 
 When activating the programmable block: Toggle block on Recompile You should see
-it align to [15, 15] (or your middle if not 3 x and y pistons) and then begin drilling.
+it align to [15, 15] (or your middle if not 3 x and y pistons) and then begin
+drilling.
 
 To park it so it can be blueprinted: Run with argument: RESET
 */
@@ -57,7 +58,7 @@ public Program()
     myScreen.FontSize = FONT_SIZE;
     myScreen.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
 
-    filterTag = Me.CustomData;
+    filterTag = Me.CustomData.Trim();
     if (!String.IsNullOrEmpty(filterTag)) {
         Log($"Tag: {filterTag}");
     }
@@ -136,6 +137,10 @@ void DiscoverPistons() {
     zPistons = FilterBlocks<IMyExtendedPistonBase>(piston => {
         return IsZero(Me.WorldMatrix.Up - piston.WorldMatrix.Down, closeEnough);
     });
+    Log($"Found: {zPistons.Count} Z pistons");
+    if (zPistons.Count == 0) {
+        throw new Exception("No Z pistons found");
+    }
 
     IMyExtendedPistonBase closestPiston = FilterBlocks<IMyExtendedPistonBase>(piston => !zPistons.Contains(piston))
         .OrderBy(piston => vecToRange(Me.GetPosition(), piston.GetPosition()))
@@ -571,8 +576,12 @@ public List<T> FilterBlocks<T>(Func<T, Boolean> filter = null) where T : class, 
     GridTerminalSystem.GetBlocksOfType(blocks, x => {
         if (!x.IsSameConstructAs(Me)) return false;
         // If a tag was defined (in CustomData), only accept blocks with that tag
+        // Log($"FB: {x.DisplayNameText}");
+        // For some reason the square brackets are getting filtered out of DisplaNameText,
+        // so just look for a match of the name, no brackets.
         if (!String.IsNullOrEmpty(filterTag) && 
-            x.DisplayNameText.IndexOf($"[{filterTag}]", 0, StringComparison.CurrentCultureIgnoreCase) == -1) {
+            !x.DisplayNameText.Contains(filterTag)) {
+            Log($"FB: {x.DisplayNameText} did not match filter {filterTag}");
             return false;
         }
         return (filter == null) || filter(x);
