@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+	<meta charset="utf-8">
+	<title>Space Engineers Star System 3D Vector math between planets/moons</title>
+	<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Open+Sans">
+    <style type="text/css">
+html {
+    background-color: #fefefe
+}
+
+body {
+    font-family: Open Sans, Arial;
+    color: #454545;
+    font-size: 16px;
+    margin: 2em auto;
+    max-width: 800px;
+    padding: 1em;
+    line-height: 1.4;
+    text-align: justify
+}
+
+a {
+    color: #07a
+}
+
+a:visited {
+    color: #941352
+}
+
+.noselect {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none
+}
+
+small {
+    font-size: .4em
+}
+
+ul li img {
+    height: 1em
+}
+
+@media screen and (max-width:500px) {
+    body {
+        text-align: left
+    }
+}
+
+div#work {
+	display: none;
+    font-family: monospace;
+    font-size: .9em;
+	border: 1px solid black;
+	padding: 1em;
+	line-height: 1;
+}
+	</style>
+	<script
+	  src="https://code.jquery.com/jquery-3.4.1.min.js"
+	  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+	  crossorigin="anonymous"></script>
+	<script>
+		function clearWork() {
+			$('#work').empty().show();
+		}
+
+		function showWork(str) {
+			$('#work').append("<p>" + str + "</p>");
+		}
+		
+		// https://stackoverflow.com/a/596503/296829
+		function toInt(value) {
+			return ~~value;
+		}
+		
+		// https://stackoverflow.com/a/11832950/296829
+		function roundToTwoDecimalPlaces(val) {
+			return Math.round((val + Number.EPSILON) * 100) / 100
+		}
+
+		function doTheMath() {
+			var x0 = parseFloat($('#x0').val());
+			var y0 = parseFloat($('#y0').val());
+			var z0 = parseFloat($('#z0').val());
+			var x1 = parseFloat($('#x1').val());
+			var y1 = parseFloat($('#y1').val());
+			var z1 = parseFloat($('#z1').val());
+			var dt = parseFloat($('#dt').val());
+			
+			clearWork();
+			//showWork("x0: " + x0 + ", y0: " + y0 + ", z0: " + z0);
+			//showWork("x1: " + x1 + ", y1: " + y1 + ", z1: " + z1);
+			
+			// distance formula
+			// d(p0, p1) = sqrt( (x1 - x0)^2 + (y1 - y0)^2 + (z1 - z0)^2 )
+			var d = Math.sqrt(
+				Math.pow(x1 - x0, 2) +
+				Math.pow(y1 - y0, 2) +
+				Math.pow(z1 - z0, 2)
+			);
+		
+			// Let the ratio of distances, t = dt / d
+			var t = dt / d; // add 0 error check
+			//showWork("d: " + d + ", dt: " + dt + ", t: " + t);
+			
+			// https://math.stackexchange.com/a/1630886/102799
+			// (xt, yt) = ( ( (1−t)x0 + tx1 ),( (1−t)y0 + ty1 ) )
+			var xt = (1 - t) * x0 + t * x1;
+			var yt = (1 - t) * y0 + t * y1;
+			var zt = (1 - t) * z0 + t * z1;
+			
+			// xt = toInt(xt);
+			// yt = toInt(yt);
+			// zt = toInt(zt);
+			xt = roundToTwoDecimalPlaces(xt);
+			yt = roundToTwoDecimalPlaces(yt);
+			zt = roundToTwoDecimalPlaces(zt);
+
+			//showWork("xt: " + xt);
+			//showWork("yt: " + yt);
+			//showWork("zt: " + zt);
+			showWork("GPS coordinates for the point " + dt + "m along the line");
+			showWork(" from (" + x0 + ", " + y0 + ", " + z0 + ") to (" + x1 + ", " + y1 + ", " + z1 + ") are:");
+			showWork("<b>(" + xt + ", " + yt + ", " + zt + ")</b>");
+			showWork("<b>GPS:VectorCoord:" + xt + ":" + yt + ":" + zt + ":");
+		}
+
+		function getCoordsForPlanet(planet) {
+			// Thanks to the following Reddit link for the position of the original 3 planets and 3 moons:
+			// https://www.reddit.com/r/spaceengineers/comments/9175ds/what_are_the_gps_coordinates_for_the_planets/
+			//
+			// You can also find this yourself by editing SANDBOX_0_0_0_.sbs in one of your save game folders.
+			// Best to make a copy of the save game first, following these instructions,
+			// from https://support.keenswh.com/spaceengineers/pc/topic/unable-to-rename-save-file
+			// 1. Select world to rename in the load game screen
+			// 2. Click "Backups"
+			// 3. Select the most recent backup save file
+			// 4. Click "Save As" on the left-hand sidebar
+			// 5. Enter new name in the dialogue.
+			//
+			// Then change `false` to `true` for all `showGps` settings in your SANDBOX_0_0_0_.sbs file in one of your save games.
+			// Then you must delete the SANDBOX_0_0_0_.sbsB5 file.
+			// It will get recreated when you load the game ("warning... older game format...")
+			// 
+			// Then when you load the game the GPS coordinates will be visible and under K -> GPS tab.
+			// Note: If you don't modify them they will disappear.
+			//
+			// TODO: I found radius information in there too, I should add that to this page
+			switch (planet) {
+				case 'Earth':
+					//       <Radius>60000</Radius>
+					return [0, 0, 0];
+				case 'Moon':
+					//       <Radius>9500</Radius>
+					return [16384, 136384, -113616];
+				case 'Mars':
+					//       <Radius>60000</Radius>
+					return [1031072, 131072, 1631072];
+				case 'Europa':
+					//       <Radius>9500</Radius>
+					return [916384, 16384, 1616384];
+				case 'Alien':
+					//       <Radius>60000</Radius>
+					return [131072, 131072, 5731072];
+				case 'Titan':
+					//       <Radius>9500</Radius>
+					return [36384, 226384, 5796384];
+				case 'Triton':
+					//       <Radius>40126.5</Radius>
+					return [-284463.5, -2434463.5, 365536.5];
+				case 'Planet 26':
+					// Radius: 60000
+					// return [-1000000, -750000, 750000];
+					return [-100000, -200000, 100000];
+				case 'Sonos':
+					// Radius: 60000
+					return [-1500000, 1000000, -500000];
+				case 'Drion':
+					// Radius: 9500
+					return [-1320000, 1000000, -500000];
+				case 'Neirri':
+					// Radius: 60000
+					// Position: (-315536, 1187464, -1065536)
+					return [-250000, 1253000, -1000000];
+				case 'Kueli':
+					// Radius: 9500
+					// Position: (-266384, 1236616, -836384)
+					return [-250000, 1253000, -820000];
+				case 'Kharak':
+					// Radius: 125000
+					return [-1000000, -1000000, -1250000];
+				case 'Agaris':
+					// Radius: 60000
+					return [50000, 100000, 250000];
+			}
+		}
+		
+		function updateCoords(point, planet) {
+			var x, y, z;
+			if (point === '0') {
+				x = $('#x0');
+				y = $('#y0');
+				z = $('#z0');
+			} else {
+				x = $('#x1');
+				y = $('#y1');
+				z = $('#z1');
+			}
+			var coords = getCoordsForPlanet(planet);
+			x.val(coords[0]);
+			y.val(coords[1]);
+			z.val(coords[2]);
+		}
+
+		function updateCoords0() {
+			updateCoords('0', $('#choice0').val());
+		}
+		
+		function updateCoords1() {
+			updateCoords('1', $('#choice1').val());
+		}
+
+		$(document).ready(function () {
+			$('#clicker').click(doTheMath);
+			$('#choice0').change(updateCoords0);
+			$('#choice1').change(updateCoords1);
+			updateCoords0();
+			updateCoords1();
+		});
+	</script>
+</head>
+<body>
+	<h3>Space Engineers Star System 3D Vector math between planets/moons</h3>
+	<form>
+	<p>
+	Point 0:
+	<select id="choice0">
+		<option value="Earth">Earth</option>
+		<option value="Moon">Moon</option>
+		<option value="Mars">Mars</option>
+		<option value="Europa">Europa</option>
+		<option value="Alien">Alien</option>
+		<option value="Titan">Titan</option>
+		<option value="Triton">Triton</option>
+		<option value="Planet 26">Planet 26</option>
+		<option value="Sonos">Sonos</option>
+		<option value="Drion">Drion</option>
+		<option value="Neirri">Neirri</option>
+		<option value="Kueli">Kueli</option> 
+		<option value="Kharak">Kharak</option> 
+		<option value="Agaris">Agaris</option> 
+	</select>
+	<b>OR</b>
+	x: <input id="x0" value="0" size="10">, y: <input id="y0" value="0" size="10">, z: <input id="z0" value="0" size="10">
+	</p>
+	<p>
+	Point 1:
+	<select id="choice1">
+		<option value="Earth">Earth</option>
+		<option value="Moon" selected>Moon</option>
+		<option value="Mars">Mars</option>
+		<option value="Europa">Europa</option>
+		<option value="Alien">Alien</option>
+		<option value="Titan">Titan</option>
+		<option value="Triton">Triton</option>
+		<option value="Planet 26">Planet 26</option>
+		<option value="Sonos">Sonos</option>
+		<option value="Drion">Drion</option>
+		<option value="Neirri">Neirri</option>
+		<option value="Kueli">Kueli</option>
+		<option value="Agaris">Agaris</option> 
+	</select>
+	<b>OR</b>
+	x: <input id="x1" value="0" size="10">, y: <input id="y1" value="0" size="10">, z: <input id="z1" value="0" size="10">
+	</p>
+	<p>
+	Distance along line starting from Point 0: <input id="dt" size="10" value="105000">m
+	</p>
+	<p>
+	<input type="button" id="clicker" value="Calculate">
+	</p>
+	</form>
+
+	<p>
+	<div id="work"></div>
+	</p>
+
+	<p><b>Notes</b>:
+		<ul>
+		<li>Radii: From center to surface, planets are about 60km and moons 9.5km (mountains and terrain will extend the radius).
+		<ul>
+			<li>However Triton has radius: 40km and Kharak has radius 125k.
+		</ul>
+		<li>Gravity wells: From their surface, planets are about 42km and moons 3.5km.
+		<ul>
+			<li>Not sure yet for Triton
+		</ul>
+		<li>Safe minimum distances from the centers for jump drive destinations are:
+			<ul>
+			<li>105000m (60km radius + 42km gravity well + 3km buffer) for planets
+			<li>15000m (9.5km radius + 3.5km gravity well + 2km buffer) for moons.
+			</ul>
+		</ul>
+	</p>
+	
+	<p><b>Some interesting things you can do</b>:
+		<ul>
+		<li>Find the point on Earth's surface closest to the Moon: Earth, Moon, 60000.
+		<li>Find the Moon's North pole: subtract (North is negative) 9500 from 136384 (Moon's y-value).
+			<ul>
+			<li>Great place for a moon base with 24 hour sunlight and plenty of ice.
+			</ul>
+		<li>Find the point on Earth's surface closest to the Moon's North pole: Earth, Moon, subtract 9500
+			from Moon's y-value (126884), 60000.
+		<li>These spots on Earth are in a mountain range so the closest accessible location is about 4km up.
+		<li>Find a safe jump point above Europa, between it and Mars: Europa, Mars, 15000.
+		</ul>
+	</p>
+	
+	<p><b>References</b>:
+		<ul>
+		<li><a href="https://www.reddit.com/r/spaceengineers/comments/9175ds/what_are_the_gps_coordinates_for_the_planets/"
+			>What are the GPS coordinates for the planets?</a>
+		<li><a href="https://www.reddit.com/r/spaceengineers/comments/7l5pbm/does_anyone_have_planet_radius_measurements/"
+			>Does anyone have Planet Radius measurements?</a>
+		<li><a href="https://www.math.usm.edu/lambers/mat169/fall09/lecture17.pdf"
+			>Three-Dimensional Coordinate Systems: The Distance Formula</a>
+		<li><a href="https://math.stackexchange.com/a/1630886/102799"
+			>Finding a point along a line a certain distance away from another point!</a>
+		<li><a href="https://thebestmotherfucking.website/"
+			>CSS thanks to this site</a>
+		</ul>
+	</p>
+</body>
+</html>
