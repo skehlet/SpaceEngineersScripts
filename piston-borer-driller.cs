@@ -11,7 +11,7 @@ When setting up a new station:
 - On the Sorter for the Ejector, remember to set a Whitelist with Stone and Ice,
   and select Drain All.
 - On the Ejector Connector, set Throw Out: On.
-- On the ship Connector, set a Blacklist with Stone and Ice, and set Drain All
+- On the Sorter for the ship, set a Blacklist with Stone and Ice, and set Drain All
   (to pull from the Drills).
 - I added support to tag only the drills+pistons+cargo containers you want it to
   consider. Add your tag value to the Programmable Block's CustomData (without
