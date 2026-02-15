@@ -6,26 +6,137 @@
 	<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Open+Sans">
     <style type="text/css">
 html {
-    background-color: #fefefe
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
 }
 
 body {
-    font-family: Open Sans, Arial;
-    color: #454545;
+    font-family: 'Open Sans', Arial, sans-serif;
+    color: #2d3748;
     font-size: 16px;
     margin: 2em auto;
-    max-width: 800px;
-    padding: 1em;
-    line-height: 1.4;
-    text-align: justify
+    max-width: 900px;
+    padding: 2em;
+    line-height: 1.6;
+    text-align: left;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+h3 {
+    color: #1a202c;
+    font-size: 1.8em;
+    margin-bottom: 1em;
+    border-bottom: 3px solid #667eea;
+    padding-bottom: 0.5em;
 }
 
 a {
-    color: #07a
+    color: #667eea;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
 }
 
 a:visited {
-    color: #941352
+    color: #764ba2;
+}
+
+.point-section {
+    background: #f7fafc;
+    border-left: 4px solid #667eea;
+    padding: 1.2em;
+    margin-bottom: 1.5em;
+    border-radius: 6px;
+}
+
+.point-section strong {
+    color: #667eea;
+    font-size: 1.1em;
+}
+
+.input-row {
+    margin: 0.8em 0;
+}
+
+input[type="text"],
+input[type="number"],
+input:not([type="button"]) {
+    padding: 0.4em 0.6em;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    font-size: 0.95em;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input:not([type="button"]):focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+select {
+    padding: 0.4em 0.6em;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    font-size: 0.95em;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+input[type="button"] {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.6em 1.5em;
+    border-radius: 6px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+
+input[type="button"]:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+input[type="button"]:active {
+    transform: translateY(0);
+}
+
+.btn-small {
+    padding: 0.4em 1em !important;
+    font-size: 0.9em !important;
+}
+
+.btn-copy {
+    background: #48bb78 !important;
+    margin-left: 0.5em;
+}
+
+.btn-copy:hover {
+    background: #38a169 !important;
+}
+
+.distance-input {
+    margin: 1.5em 0;
+}
+
+.calculate-section {
+    margin: 2em 0;
+    text-align: center;
 }
 
 .noselect {
@@ -33,30 +144,68 @@ a:visited {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    user-select: none
+    user-select: none;
 }
 
 small {
-    font-size: .4em
+    font-size: .4em;
 }
 
 ul li img {
-    height: 1em
+    height: 1em;
 }
 
 @media screen and (max-width:500px) {
     body {
-        text-align: left
+        padding: 1em;
     }
 }
 
 div#work {
-	display: none;
-    font-family: monospace;
-    font-size: .9em;
-	border: 1px solid black;
-	padding: 1em;
-	line-height: 1;
+    display: none;
+    font-family: 'Courier New', monospace;
+    font-size: 1em;
+    background: #f7fafc;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    padding: 1.5em;
+    line-height: 1.6;
+    margin: 2em 0;
+}
+
+div#work p {
+    margin: 0.5em 0;
+}
+
+div#work b {
+    color: #667eea;
+    font-size: 1.1em;
+}
+
+.helper-text {
+    color: #718096;
+    font-style: italic;
+    font-size: 0.9em;
+    margin-left: 0.5em;
+}
+
+.notes-section {
+    background: #fffaf0;
+    border-left: 4px solid #ed8936;
+    padding: 1em;
+    margin: 2em 0;
+    border-radius: 6px;
+}
+
+.notes-section b {
+    color: #c05621;
+}
+
+.copy-notification {
+    display: none;
+    color: #48bb78;
+    font-weight: 600;
+    margin-left: 0.5em;
 }
 	</style>
 	<script
@@ -81,6 +230,8 @@ div#work {
 		function roundToTwoDecimalPlaces(val) {
 			return Math.round((val + Number.EPSILON) * 100) / 100
 		}
+
+		var lastGpsString = ''; // Store the last calculated GPS string
 
 		function doTheMath() {
 			var x0 = parseFloat($('#x0').val());
@@ -123,10 +274,16 @@ div#work {
 			//showWork("xt: " + xt);
 			//showWork("yt: " + yt);
 			//showWork("zt: " + zt);
-			showWork("GPS coordinates for the point " + dt + "m along the line");
-			showWork(" from (" + x0 + ", " + y0 + ", " + z0 + ") to (" + x1 + ", " + y1 + ", " + z1 + ") are:");
-			showWork("<b>(" + xt + ", " + yt + ", " + zt + ")</b>");
-			showWork("<b>GPS:VectorCoord:" + xt + ":" + yt + ":" + zt + ":");
+			lastGpsString = "GPS:VectorCoord:" + xt + ":" + yt + ":" + zt + ":";
+			showWork("GPS coordinates for the point <b>" + dt + "m</b> along the line");
+			showWork("from (" + x0 + ", " + y0 + ", " + z0 + ") to (" + x1 + ", " + y1 + ", " + z1 + ") are:");
+			showWork("<br><b>(" + xt + ", " + yt + ", " + zt + ")</b>");
+			showWork("<br><b>" + lastGpsString + "</b> <input type='button' class='btn-small btn-copy' id='copyBtn' value='Copy GPS'><span class='copy-notification' id='copyNotif'>✓ Copied!</span>");
+			
+			// Attach click handler to the copy button
+			setTimeout(function() {
+				$('#copyBtn').click(copyGpsToClipboard);
+			}, 100);
 		}
 
 		function getCoordsForPlanet(planet) {
@@ -224,10 +381,92 @@ div#work {
 			updateCoords('1', $('#choice1').val());
 		}
 
+		function parseGPS(gpsString, point) {
+			// Parse GPS format: GPS:name:x:y:z:#color:
+			gpsString = gpsString.trim();
+			if (!gpsString.startsWith('GPS:')) {
+				alert('Invalid GPS format. Expected format: GPS:name:x:y:z:#color:');
+				return;
+			}
+			
+			var parts = gpsString.split(':');
+			if (parts.length < 5) {
+				alert('Invalid GPS format. Expected format: GPS:name:x:y:z:#color:');
+				return;
+			}
+			
+			var x = parseFloat(parts[2]);
+			var y = parseFloat(parts[3]);
+			var z = parseFloat(parts[4]);
+			
+			if (isNaN(x) || isNaN(y) || isNaN(z)) {
+				alert('Invalid coordinates in GPS string.');
+				return;
+			}
+			
+			if (point === '0') {
+				$('#x0').val(x);
+				$('#y0').val(y);
+				$('#z0').val(z);
+				$('#gps0').val(''); // Clear after parsing
+			} else {
+				$('#x1').val(x);
+				$('#y1').val(y);
+				$('#z1').val(z);
+				$('#gps1').val(''); // Clear after parsing
+			}
+		}
+
+		function parseGPS0() {
+			parseGPS($('#gps0').val(), '0');
+		}
+		
+		function parseGPS1() {
+			parseGPS($('#gps1').val(), '1');
+		}
+
+		function copyGpsToClipboard() {
+			if (!lastGpsString) {
+				alert('No GPS coordinates to copy. Please calculate first.');
+				return;
+			}
+			
+			// Use modern clipboard API
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(lastGpsString).then(function() {
+					$('#copyNotif').fadeIn(200).delay(2000).fadeOut(200);
+				}, function() {
+					// Fallback for older browsers
+					fallbackCopy(lastGpsString);
+				});
+			} else {
+				fallbackCopy(lastGpsString);
+			}
+		}
+
+		function fallbackCopy(text) {
+			var textArea = document.createElement('textarea');
+			textArea.value = text;
+			textArea.style.position = 'fixed';
+			textArea.style.left = '-999999px';
+			document.body.appendChild(textArea);
+			textArea.focus();
+			textArea.select();
+			try {
+				document.execCommand('copy');
+				$('#copyNotif').fadeIn(200).delay(2000).fadeOut(200);
+			} catch (err) {
+				alert('Failed to copy to clipboard');
+			}
+			document.body.removeChild(textArea);
+		}
+
 		$(document).ready(function () {
 			$('#clicker').click(doTheMath);
 			$('#choice0').change(updateCoords0);
 			$('#choice1').change(updateCoords1);
+			$('#parseGps0').click(parseGPS0);
+			$('#parseGps1').click(parseGPS1);
 			updateCoords0();
 			updateCoords1();
 		});
@@ -236,9 +475,16 @@ div#work {
 <body>
 	<h3>Space Engineers Star System 3D Vector math between planets/moons</h3>
 	<form>
-	<p>
-	Point 0:
-	<select id="choice0">
+	<div class="point-section">
+	<strong>Point 0:</strong>
+	<div class="input-row">
+		x: <input id="x0" value="0" size="10"> 
+		y: <input id="y0" value="0" size="10"> 
+		z: <input id="z0" value="0" size="10">
+	</div>
+	<div class="input-row">
+		<span class="helper-text">Quick fill from planet:</span>
+		<select id="choice0">
 		<option value="Earth">Earth</option>
 		<option value="Moon">Moon</option>
 		<option value="Mars">Mars</option>
@@ -254,12 +500,24 @@ div#work {
 		<option value="Kharak">Kharak</option> 
 		<option value="Agaris">Agaris</option> 
 	</select>
-	<b>OR</b>
-	x: <input id="x0" value="0" size="10">, y: <input id="y0" value="0" size="10">, z: <input id="z0" value="0" size="10">
-	</p>
-	<p>
-	Point 1:
-	<select id="choice1">
+	</div>
+	<div class="input-row">
+		<span class="helper-text">Or paste GPS from game:</span>
+		<input id="gps0" size="50" placeholder="GPS:name:x:y:z:#color:">
+		<input type="button" class="btn-small" id="parseGps0" value="Parse">
+	</div>
+	</div>
+	
+	<div class="point-section">
+	<strong>Point 1:</strong>
+	<div class="input-row">
+		x: <input id="x1" value="0" size="10"> 
+		y: <input id="y1" value="0" size="10"> 
+		z: <input id="z1" value="0" size="10">
+	</div>
+	<div class="input-row">
+		<span class="helper-text">Quick fill from planet:</span>
+		<select id="choice1">
 		<option value="Earth">Earth</option>
 		<option value="Moon" selected>Moon</option>
 		<option value="Mars">Mars</option>
@@ -274,21 +532,27 @@ div#work {
 		<option value="Kueli">Kueli</option>
 		<option value="Agaris">Agaris</option> 
 	</select>
-	<b>OR</b>
-	x: <input id="x1" value="0" size="10">, y: <input id="y1" value="0" size="10">, z: <input id="z1" value="0" size="10">
-	</p>
-	<p>
-	Distance along line starting from Point 0: <input id="dt" size="10" value="105000">m
-	</p>
-	<p>
-	<input type="button" id="clicker" value="Calculate">
-	</p>
+	</div>
+	<div class="input-row">
+		<span class="helper-text">Or paste GPS from game:</span>
+		<input id="gps1" size="50" placeholder="GPS:name:x:y:z:#color:">
+		<input type="button" class="btn-small" id="parseGps1" value="Parse">
+	</div>
+	</div>
+	
+	<div class="distance-input">
+		<strong>Distance along line starting from Point 0:</strong> 
+		<input id="dt" size="10" value="105000"> meters
+	</div>
+	
+	<div class="calculate-section">
+		<input type="button" id="clicker" value="Calculate GPS Coordinates">
+	</div>
 	</form>
 
-	<p>
 	<div id="work"></div>
-	</p>
 
+	<div class="notes-section">
 	<p><b>Notes</b>:
 		<ul>
 		<li>Radii: From center to surface, planets are about 60km and moons 9.5km (mountains and terrain will extend the radius).
@@ -306,18 +570,23 @@ div#work {
 			</ul>
 		</ul>
 	</p>
+	</div>
 	
 	<p><b>Some interesting things you can do</b>:
 		<ul>
-		<li>Find the point on Earth's surface closest to the Moon: Earth, Moon, 60000.
-		<li>Find the Moon's North pole: subtract (North is negative) 9500 from 136384 (Moon's y-value).
-			<ul>
-			<li>Great place for a moon base with 24 hour sunlight and plenty of ice.
-			</ul>
-		<li>Find the point on Earth's surface closest to the Moon's North pole: Earth, Moon, subtract 9500
-			from Moon's y-value (126884), 60000.
-		<li>These spots on Earth are in a mountain range so the closest accessible location is about 4km up.
-		<li>Find a safe jump point above Europa, between it and Mars: Europa, Mars, 15000.
+		<li><strong>Find the point on Earth's surface closest to the Moon:</strong><br>
+			Set Point 0 to <em>Earth</em>, Point 1 to <em>Moon</em>, and Distance to <strong>60000</strong> (Earth's radius).
+		
+		<li><strong>Find the Moon's North Pole (great for a base with 24-hour sunlight and ice):</strong><br>
+			Set Point 0 to <em>Moon</em>, Point 1 to manually enter <strong>x: 16384, y: 126884, z: -113616</strong> (Moon's y-value minus 9500), and Distance to <strong>0</strong>.<br>
+			<em>Note: North is negative Y direction, so we subtract the Moon's radius from its center Y coordinate.</em>
+		
+		<li><strong>Find the point on Earth's surface closest to the Moon's North Pole:</strong><br>
+			Set Point 0 to <em>Earth</em>, Point 1 to manually enter <strong>x: 16384, y: 126884, z: -113616</strong>, and Distance to <strong>60000</strong>.<br>
+			<em>Note: This location is in a mountain range, so the closest accessible point is about 4km above the calculated position.</em>
+		
+		<li><strong>Find a safe jump point above Europa (between Europa and Mars):</strong><br>
+			Set Point 0 to <em>Europa</em>, Point 1 to <em>Mars</em>, and Distance to <strong>15000</strong> (safe distance for moon clearance).
 		</ul>
 	</p>
 	
